@@ -1,0 +1,4 @@
+.env
+.superpowers/
+stacks/immich/docker-compose.yml
+stacks/immich/.env

@@ -1,0 +1,113 @@
+# Media pipeline: Seerr -> Sonarr/Radarr -> Prowlarr -> Decypharr -> Real-Debrid -> Jellyfin
+#
+# Path rules (the whole pipeline depends on these):
+#   - ${DATA} is mounted as /data in every container, so /data/downloads and
+#     /data/media are on the SAME filesystem (hardlinks work, nothing is ever copied).
+#   - The Real-Debrid mount lives at ${DEBRID_MOUNT} on the host AND at the same
+#     path inside every container. Decypharr's symlinks are absolute paths into it,
+#     so Sonarr, Radarr and Jellyfin must see it at the identical path.
+#   - Decypharr mounts with rshared (it creates the FUSE mount); everyone else
+#     uses rslave (they see the mount Decypharr creates).
+
+name: media
+
+x-env: &env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+
+services:
+  decypharr:
+    image: cy01/blackhole:latest
+    container_name: decypharr
+    environment: *env
+    ports:
+      - "8282:8282"
+    volumes:
+      - ${APPDATA}/decypharr:/app
+      - ${DATA}:/data
+      - ${DEBRID_MOUNT}:${DEBRID_MOUNT}:rshared
+    devices:
+      - /dev/fuse:/dev/fuse:rwm
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment: *env
+    ports:
+      - "9696:9696"
+    volumes:
+      - ${APPDATA}/prowlarr:/config
+    restart: unless-stopped
+
+  flaresolverr:
+    # Lets Prowlarr get past Cloudflare on public indexers. Internal only.
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      TZ: ${TZ}
+      LOG_LEVEL: info
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment: *env
+    ports:
+      - "8989:8989"
+    volumes:
+      - ${APPDATA}/sonarr:/config
+      - ${DATA}:/data
+      - ${DEBRID_MOUNT}:${DEBRID_MOUNT}:rslave
+    depends_on:
+      - decypharr
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment: *env
+    ports:
+      - "7878:7878"
+    volumes:
+      - ${APPDATA}/radarr:/config
+      - ${DATA}:/data
+      - ${DEBRID_MOUNT}:${DEBRID_MOUNT}:rslave
+    depends_on:
+      - decypharr
+    restart: unless-stopped
+
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment: *env
+    ports:
+      - "8096:8096"
+    volumes:
+      - ${APPDATA}/jellyfin:/config
+      - ${DATA}/media:/data/media:ro
+      - ${DEBRID_MOUNT}:${DEBRID_MOUNT}:ro,rslave
+    # Intel/AMD iGPU hardware transcoding — uncomment if the box has one:
+    # devices:
+    #   - /dev/dri:/dev/dri
+    depends_on:
+      - decypharr
+    restart: unless-stopped
+
+  seerr:
+    # Successor to Jellyseerr/Overseerr. Runs as UID 1000 internally.
+    image: ghcr.io/seerr-team/seerr:latest
+    container_name: seerr
+    init: true
+    environment:
+      TZ: ${TZ}
+    ports:
+      - "5055:5055"
+    volumes:
+      - ${APPDATA}/seerr:/app/config
+    restart: unless-stopped

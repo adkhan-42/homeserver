@@ -1,0 +1,18 @@
+# AdGuard Home — network-wide ad/tracker blocking via DNS.
+# Host networking so AdGuard sees each device's real IP (per-device stats & rules)
+# and can bind port 53 directly.
+#   First run: open http://<server-ip>:3000 for the setup wizard.
+#   In the wizard set the admin web interface to port 8053 (keeps 80 free for later)
+#   and DNS to port 53 on all interfaces.
+
+name: adguard
+
+services:
+  adguardhome:
+    image: adguard/adguardhome:latest
+    container_name: adguardhome
+    network_mode: host
+    volumes:
+      - ${APPDATA}/adguard/work:/opt/adguardhome/work
+      - ${APPDATA}/adguard/conf:/opt/adguardhome/conf
+    restart: unless-stopped
