@@ -68,6 +68,16 @@ and can optionally message an AI helper that fixes things for him.
 | ReCasaOS (community CasaOS fork) | ❌ | Tested on 26.04 and has backups, alerts and RAID built in, but it only started in Sept 2026 with a tiny community. Upstream CasaOS was abandoned in 2025. Too risky for a box that should run for years. |
 | Our own Compose stacks (current repo) + Portainer | ❌ | The friend can't add apps without a terminal or Portainer's Docker-jargon UI. Only worth it if the Real-Debrid pipeline becomes a priority. |
 
+**Cloud copy target** (open: the owner is discussing it with the friend; B2 is the default until then)
+
+| | At 200 GB | Why / why not |
+|---|---|---|
+| **Backblaze B2** | ~$1.20/mo, free restores | Default. Simplest setup, pay per GB, free downloads up to ~3× stored. |
+| Hetzner Storage Box | ~€3.50/mo (1 TB fixed) | Cheaper than B2 past ~600 GB. restic over SFTP. Candidate second option. |
+| S3 Glacier Instant Retrieval | ~$0.80/mo | Works with restic as normal (instant reads), but $0.03/GB retrieval + AWS egress make a full restore ~$24, prune costs fees, 90-day minimum, and AWS setup is hard for the friend. Worth revisiting at multi-TB. |
+| S3 Glacier Flexible / Deep Archive | ~$0.70 / ~$0.20/mo | Not usable as a normal restic repo: reads need a 1 min–48 h thaw, no practical prune, 90/180-day minimums. |
+| Monthly instead of nightly copy | Same cost | Rejected for now: restic only uploads changes, so it saves almost nothing and risks losing up to a month of photos. |
+
 **Installer**
 
 | | Picked? | Why |
